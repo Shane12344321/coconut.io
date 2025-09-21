@@ -4,11 +4,11 @@ coconut.io/\
   ├── backend/\
   │   ├── app.py\
   │   ├── processing.py\
-  │   ├── requirements.txt\
-  ├── frontend/\
-  │   ├── package.json\
-  │   ├── src/\
-  ├── uploads/     # for uploaded videos\
-  ├── clips/       # for generated clips\
-  ├── .gitignore\
-  └── README.md\
+  ├── templates/      # HTML files\
+  │   └── index.html\
+  ├── static/         # CSS, JS, images\
+  │   ├── css/\
+  │   └── js/\
+  ├── uploads/        # uploaded videos\
+  └── clips/          # processed clips\
+
