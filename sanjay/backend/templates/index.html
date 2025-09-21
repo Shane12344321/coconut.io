@@ -2,29 +2,74 @@
 <html>
 <head>
     <title>ClipCompass</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .segment { margin-bottom: 15px; padding: 8px; border: 1px solid #ccc; border-radius: 5px; }
+        .timestamp { font-weight: bold; color: #555; margin-right: 10px; }
+        #transcript { margin-top: 20px; }
+    </style>
 </head>
 <body>
-    <h1>Upload Video</h1>
+    <h1>ClipCompass MVP</h1>
     <form id="uploadForm" enctype="multipart/form-data">
-        <input type="file" name="file" id="fileInput">
+        <input type="file" name="file" id="fileInput" accept="video/*" required>
         <button type="submit">Upload</button>
     </form>
+
     <div id="response"></div>
+    <div id="transcript"></div>
 
     <script>
     const form = document.getElementById("uploadForm");
+    const responseDiv = document.getElementById("response");
+    const transcriptDiv = document.getElementById("transcript");
+
     form.addEventListener("submit", async (e) => {
         e.preventDefault();
+        responseDiv.innerHTML = "Uploading video...";
+        transcriptDiv.innerHTML = "";
+
         const fileInput = document.getElementById("fileInput");
         const formData = new FormData();
         formData.append("file", fileInput.files[0]);
 
-        const res = await fetch("/upload", {
-            method: "POST",
-            body: formData
-        });
-        const data = await res.json();
-        document.getElementById("response").innerText = JSON.stringify(data);
+        try {
+            const res = await fetch("/upload", {
+                method: "POST",
+                body: formData
+            });
+            const data = await res.json();
+
+            if (data.error) {
+                responseDiv.innerHTML = `<span style="color:red">${data.error}</span>`;
+                return;
+            }
+
+            responseDiv.innerHTML = `<span style="color:green">${data.message}</span>`;
+
+            const transcription = data.transcription;
+            transcriptDiv.innerHTML = `<h2>Full Transcript:</h2><p>${transcription.full_transcript}</p>`;
+            transcriptDiv.innerHTML += `<h2>Segments & Clips:</h2>`;
+
+            transcription.segments.forEach((seg, i) => {
+                const div = document.createElement("div");
+                div.className = "segment";
+                const clip_url = `/clips/${data.clips[i]}`;
+                div.innerHTML = `
+                    <span class="timestamp">${seg.start_time}s - ${seg.end_time}s</span>
+                    ${seg.text}
+                    <br>
+                    <video width="320" height="180" controls>
+                        <source src="${clip_url}" type="video/mp4">
+                        Your browser does not support the video tag.
+                    </video>
+                `;
+                transcriptDiv.appendChild(div);
+            });
+
+        } catch (err) {
+            responseDiv.innerHTML = `<span style="color:red">Error: ${err}</span>`;
+        }
     });
     </script>
 </body>
