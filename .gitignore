@@ -1,0 +1,11 @@
+# Python
+__pycache__/
+*.pyc
+venv/
+
+# Node
+node_modules/
+
+# Uploads and clips (we don’t want large video files in git)
+uploads/
+clips/
