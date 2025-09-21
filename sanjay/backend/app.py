@@ -1,4 +1,5 @@
 from flask import Flask, render_template, request, jsonify
+from processing import transcribe
 import os, subprocess
 
 app = Flask(__name__)
@@ -21,9 +22,9 @@ def upload_video():
     file.save(filepath)
 
     audio_path = os.path.join(UPLOAD_FOLDER, "audio.wav")
-    subprocess.run(["ffmpeg", "-y", "-i", filepath, audio_path])
-
-    return jsonify({"message": "Video uploaded", "audio_path": audio_path})
+    subprocess.run([r"C:\ffmpeg\ffmpeg.exe", "-y", "-i", filepath, audio_path])
+    transcript, segments = transcribe(audio_path)
+    return jsonify({"message": "Video uploaded and transcribed","transcript": transcript,"segments": segments, "audio_path": audio_path})
 
 if __name__ == "__main__":
     app.run(debug=True)
