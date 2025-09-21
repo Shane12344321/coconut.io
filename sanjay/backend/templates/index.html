@@ -1,76 +1,95 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
     <title>ClipCompass</title>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <style>
-        body { font-family: Arial, sans-serif; margin: 20px; }
-        .segment { margin-bottom: 15px; padding: 8px; border: 1px solid #ccc; border-radius: 5px; }
-        .timestamp { font-weight: bold; color: #555; margin-right: 10px; }
-        #transcript { margin-top: 20px; }
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        #progressContainer { margin-top: 10px; }
+        #log { border: 1px solid #ccc; padding: 10px; height: 200px; overflow-y: auto; background: #f9f9f9; }
+        video { margin: 5px; width: 200px; }
     </style>
 </head>
 <body>
-    <h1>ClipCompass MVP</h1>
-    <form id="uploadForm" enctype="multipart/form-data">
-        <input type="file" name="file" id="fileInput" accept="video/*" required>
-        <button type="submit">Upload</button>
-    </form>
 
-    <div id="response"></div>
-    <div id="transcript"></div>
+<h1>ClipCompass</h1>
 
-    <script>
-    const form = document.getElementById("uploadForm");
-    const responseDiv = document.getElementById("response");
-    const transcriptDiv = document.getElementById("transcript");
+<form id="uploadForm" enctype="multipart/form-data">
+    <input type="file" name="file" id="fileInput" accept="video/*" required>
+    <button type="submit">Upload Video</button>
+</form>
 
-    form.addEventListener("submit", async (e) => {
-        e.preventDefault();
-        responseDiv.innerHTML = "Uploading video...";
-        transcriptDiv.innerHTML = "";
+<div id="progressContainer">
+    <progress id="uploadProgress" value="0" max="100" style="width:100%;"></progress>
+</div>
 
-        const fileInput = document.getElementById("fileInput");
-        const formData = new FormData();
-        formData.append("file", fileInput.files[0]);
+<h2>Logs:</h2>
+<div id="log"></div>
 
-        try {
-            const res = await fetch("/upload", {
-                method: "POST",
-                body: formData
-            });
-            const data = await res.json();
+<h2>Generated Clips:</h2>
+<div id="clipsContainer"></div>
 
-            if (data.error) {
-                responseDiv.innerHTML = `<span style="color:red">${data.error}</span>`;
-                return;
-            }
+<script>
+const socket = io("http://127.0.0.1:5000");
 
-            responseDiv.innerHTML = `<span style="color:green">${data.message}</span>`;
+// Add a message to the log
+function addLog(msg, type="info") {
+    const log = document.getElementById('log');
+    let color = type === "error" ? "red" : "black";
+    log.innerHTML += `<span style="color:${color}">${msg}</span><br>`;
+    log.scrollTop = log.scrollHeight;
+}
 
-            const transcription = data.transcription;
-            transcriptDiv.innerHTML = `<h2>Full Transcript:</h2><p>${transcription.full_transcript}</p>`;
-            transcriptDiv.innerHTML += `<h2>Segments & Clips:</h2>`;
+// Handle video upload
+document.getElementById('uploadForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const fileInput = document.getElementById('fileInput');
+    if (!fileInput.files.length) return alert("Select a video first");
 
-            transcription.segments.forEach((seg, i) => {
-                const div = document.createElement("div");
-                div.className = "segment";
-                const clip_url = `/clips/${data.clips[i]}`;
-                div.innerHTML = `
-                    <span class="timestamp">${seg.start_time}s - ${seg.end_time}s</span>
-                    ${seg.text}
-                    <br>
-                    <video width="320" height="180" controls>
-                        <source src="${clip_url}" type="video/mp4">
-                        Your browser does not support the video tag.
-                    </video>
-                `;
-                transcriptDiv.appendChild(div);
-            });
+    const formData = new FormData();
+    formData.append("file", fileInput.files[0]);
 
-        } catch (err) {
-            responseDiv.innerHTML = `<span style="color:red">Error: ${err}</span>`;
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", "/upload", true);
+
+    xhr.upload.addEventListener("progress", function(e) {
+        if (e.lengthComputable) {
+            const percent = (e.loaded / e.total) * 100;
+            document.getElementById('uploadProgress').value = percent;
         }
     });
-    </script>
+
+    xhr.onreadystatechange = function() {
+        if (xhr.readyState == 4) {
+            if (xhr.status == 200) {
+                addLog("Upload successful! Processing started...");
+            } else {
+                addLog("Upload failed: " + xhr.responseText, "error");
+            }
+        }
+    };
+
+    xhr.send(formData);
+});
+
+// SocketIO events
+socket.on('processing_start', data => addLog(`Job ${data.job_id}: ${data.message}`));
+socket.on('clip_progress', data => addLog(`Job ${data.job_id}: Segment ${data.current}/${data.total} - "${data.text}"`));
+socket.on('clip_complete', data => {
+    addLog(`Job ${data.job_id} completed! Total clips: ${data.clips.length}`);
+    const clipsDiv = document.getElementById('clipsContainer');
+    clipsDiv.innerHTML = "";
+    data.clips.forEach(c => {
+        const vid = document.createElement("video");
+        vid.src = "/clips/" + c;
+        vid.controls = true;
+        clipsDiv.appendChild(vid);
+    });
+});
+socket.on('processing_error', data => addLog(`Job ${data.job_id} ERROR: ${data.error}`, "error"));
+socket.on('clip_error', data => addLog(`Job ${data.job_id} Segment ${data.segment} ERROR: ${data.error}`, "error"));
+</script>
+
 </body>
 </html>
